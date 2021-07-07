@@ -36,7 +36,7 @@ int print_result(struct timeval start, struct timeval stop, int so_snd_buf, unsi
 void sig_alrm()
 {
     has_alrm = 1;
-    if (debug) {
+    if (debug > 1) {
         fprintf(stderr, "has_alrm\n");
     }
     return;
@@ -65,7 +65,13 @@ int child_proc(int connfd, int bufsize, int rate, int data_send_sec, int data_re
     for ( ; ; ) {
         if (has_alrm) {
             has_alrm = 0;
+            if (debug) {
+                fprintfwt(stderr, "entering sleep\n");
+            }
             sleep(data_rest_sec);
+            if (debug) {
+                fprintfwt(stderr, "exiting sleep\n");
+            }
             if (rate > 0) {
                 /*
                  * XXX 
