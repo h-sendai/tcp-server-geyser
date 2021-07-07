@@ -42,7 +42,7 @@ void sig_alrm()
     return;
 }
 
-int child_proc(int connfd, int bufsize, int rate, int data_send_sec, int data_rest_sec)
+int child_proc(int connfd, int bufsize, int rate, int data_send_sec, int data_rest_sec, int tcp_nodelay)
 {
     int n;
     unsigned char *buf;
@@ -62,6 +62,12 @@ int child_proc(int connfd, int bufsize, int rate, int data_send_sec, int data_re
     my_signal(SIGALRM, sig_alrm);
     gettimeofday(&start, NULL);
     set_timer(data_send_sec, 0, data_send_sec + data_rest_sec, 0);
+
+    if (tcp_nodelay) {
+        if (set_so_nodelay(connfd) < 0) {
+            warnx("set_so_nodelay failed");
+        }
+    }
     for ( ; ; ) {
         if (has_alrm) {
             has_alrm = 0;
@@ -143,6 +149,7 @@ int usage(void)
 "-b bufsize:    one send size (may add k for kilo, m for mega)\n"
 "-p port:       port number (1234)\n"
 "-r rate:       data send rate (bytes/sec).  k for kilo, m for mega\n"
+"-n:            set TCP_NODELAY\n"
 "-D data_send_sec: data send seconds.  default 10 seconds\n"
 "-R data_rest_sec: data rest seconds.  default 10 seconds\n";
 
@@ -163,8 +170,9 @@ int main(int argc, char *argv[])
     int rate = 0;
     int data_send_sec = 10;
     int data_rest_sec = 10;
+    int tcp_nodelay = 0;
 
-    while ( (c = getopt(argc, argv, "b:dhp:r:D:R:")) != -1) {
+    while ( (c = getopt(argc, argv, "b:dhnp:r:D:R:")) != -1) {
         switch (c) {
             case 'b':
                 bufsize = get_num(optarg);
@@ -175,6 +183,9 @@ int main(int argc, char *argv[])
             case 'h':
                 usage();
                 exit(0);
+            case 'n':
+                tcp_nodelay = 1;
+                break;
             case 'p':
                 port = strtol(optarg, NULL, 0);
                 break;
@@ -213,7 +224,7 @@ int main(int argc, char *argv[])
             if (close(listenfd) < 0) {
                 err(1, "close listenfd");
             }
-            if (child_proc(connfd, bufsize, rate, data_send_sec, data_rest_sec) < 0) {
+            if (child_proc(connfd, bufsize, rate, data_send_sec, data_rest_sec, tcp_nodelay) < 0) {
                 errx(1, "child_proc");
             }
             exit(0);
