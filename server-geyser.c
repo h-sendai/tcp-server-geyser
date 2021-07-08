@@ -42,7 +42,7 @@ void sig_alrm()
     return;
 }
 
-int child_proc(int connfd, int bufsize, int rate, int data_send_sec, int data_rest_sec, int tcp_nodelay)
+int child_proc(int connfd, int bufsize, int rate, double data_send_sec, double data_rest_sec, int tcp_nodelay)
 {
     int n;
     unsigned char *buf;
@@ -61,13 +61,22 @@ int child_proc(int connfd, int bufsize, int rate, int data_send_sec, int data_re
 
     my_signal(SIGALRM, sig_alrm);
     gettimeofday(&start, NULL);
-    set_timer(data_send_sec, 0, data_send_sec + data_rest_sec, 0);
+    struct timeval data_send = float2timeval(data_send_sec);
+    struct timeval data_rest = float2timeval(data_rest_sec);
+    struct timeval itimer;
+    timeradd(&data_send, &data_rest, &itimer);
+    set_timer(data_send.tv_sec, data_send.tv_usec, itimer.tv_sec, itimer.tv_usec);
+    if (debug) {
+        fprintf(stderr, "data_send.tv_sec: %ld, data_send.tv_usec: %ld, itimer.tv_sec: %ld, itimer.tv_usec: %ld\n",
+            data_send.tv_sec, data_send.tv_usec, itimer.tv_sec, itimer.tv_usec);
+    }
 
     if (tcp_nodelay) {
         if (set_so_nodelay(connfd) < 0) {
             warnx("set_so_nodelay failed");
         }
     }
+
     for ( ; ; ) {
         if (has_alrm) {
             has_alrm = 0;
@@ -150,8 +159,8 @@ int usage(void)
 "-p port:       port number (1234)\n"
 "-r rate:       data send rate (bytes/sec).  k for kilo, m for mega\n"
 "-n:            set TCP_NODELAY\n"
-"-D data_send_sec: data send seconds.  default 10 seconds\n"
-"-R data_rest_sec: data rest seconds.  default 10 seconds\n";
+"-D data_send_sec: data send seconds.  default 10 seconds.  May be double value (0.5 etc)\n"
+"-R data_rest_sec: data rest seconds.  default 10 seconds.  May be double value (1.5 etc)\n";
 
     fprintf(stderr, msg);
 
@@ -168,8 +177,8 @@ int main(int argc, char *argv[])
     int c;
     int bufsize = 1460;
     int rate = 0;
-    int data_send_sec = 10;
-    int data_rest_sec = 10;
+    double data_send_sec = 10.0;
+    double data_rest_sec = 10.0;
     int tcp_nodelay = 0;
 
     while ( (c = getopt(argc, argv, "b:dhnp:r:D:R:")) != -1) {
@@ -193,10 +202,10 @@ int main(int argc, char *argv[])
                 rate = get_num(optarg);
                 break;
             case 'D':
-                data_send_sec = strtol(optarg, NULL, 0);
+                data_send_sec = strtod(optarg, NULL);
                 break;
             case 'R':
-                data_rest_sec = strtol(optarg, NULL, 0);
+                data_rest_sec = strtod(optarg, NULL);
                 break;
             default:
                 break;
