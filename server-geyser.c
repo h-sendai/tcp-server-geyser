@@ -83,7 +83,8 @@ int child_proc(int connfd, int bufsize, int rate, double data_send_sec, double d
             if (debug) {
                 fprintfwt(stderr, "entering sleep\n");
             }
-            sleep(data_rest_sec);
+            useconds_t data_rest_usec = data_rest_sec * 1000000;
+            usleep(data_rest_usec);
             if (debug) {
                 fprintfwt(stderr, "exiting sleep\n");
             }
